@@ -1,0 +1,6 @@
+[submodule "lib/asio"]
+	path = lib/asio
+	url = https://github.com/chriskohlhoff/asio/
+[submodule "lib/bit7z"]
+	path = lib/bit7z
+	url = https://github.com/rikyoz/bit7z

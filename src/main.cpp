@@ -1,0 +1,41 @@
+#define ASIO_STANDALONE
+#include <asio.hpp>
+#include "ftp_connection.hpp"
+#include <iostream>
+#include "ftp_server.hpp"
+
+
+int main(int argc, char* argv[]) {
+	printf("usage: .exe [port] \"[path to root]\"\n");
+
+	if (argc == 3) {
+		int port = -1;
+		if (sscanf(argv[1], "%d", &port) != 1) {
+			printf("couldn't parse port parameter!\n");
+			return -1;
+		}
+
+		try {
+			asio::io_context io_context;
+			tcp::endpoint endp(tcp::v4(), port);
+			server ser(io_context, endp, argv[2]);
+			printf("server started on port %d with root folder %s\n", port, argv[2]);
+			io_context.run();
+		}
+		catch (const std::system_error& e) {
+			printf("error: %s", e.what());
+		}
+		
+	}
+	else {
+		printf("not enough arguments, or too many! we need 2, we have %d\n", argc - 1);
+		std::cin.ignore();
+	}
+
+	
+	//Ftpconn conn;
+	//conn.connect("192.168.68.108", 6760);
+	//while (true) {
+	//	std::cout << conn.readLine() << "\n";
+	//}
+}
