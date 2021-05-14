@@ -9,6 +9,7 @@
 #include <fstream>
 #include <chrono>
 #include <thread>
+#include <list>
 
 #include <Windows.h>
 
@@ -36,33 +37,47 @@ std::string list_complete(fs::path& path) {
 		const auto extt = e.extension().u8string();
 
 		if (extt == ".7z" || extt == ".rar" || extt == ".zip" ) {
-			BitArchiveInfo arc{ lib, wide_curr_path, BitFormat::Auto };
+			try {
+				BitArchiveInfo arc{ lib, wide_curr_path, BitFormat::Auto };
 
 
-			for (const auto& a : arc.items()) {
+				for (const auto& a : arc.items()) {
 
-				fs::path fname = a.name();
+					fs::path fname = a.name();
 
-				const auto ext = fname.extension().u8string();
-				//we only go one archive layer deep, so we don't need to patch it here
+					const auto ext = fname.extension().u8string();
+					//we only go one archive layer deep, so we don't need to patch it here
 
-				if (!a.isDir()) {
-					towrite += "Type=file;Size=" + std::to_string(a.size()) + ";Modify=17070101010101.000;Perm=r; ";
+					if (!a.isDir()) {
+						towrite += "Type=file;Size=" + std::to_string(a.size()) + ";Modify=17070101010101.000;Perm=r; ";
+
+						for (const auto& b : fs::path(a.path())) {
+							towrite += "__";
+							towrite += b.u8string();
+						}
+
+
+						towrite += "\r\n";
+					}
+					//else if (a.isDir()) {
+					//	towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
+					//}
+
+					
+
+
+
+					//towrite += fname.u8string();
 				}
-				else if (a.isDir()) {
-					towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
-				}
 
-				//for (const auto& b : fs::path(a.path())) {
-				//	towrite += "__";
-				//	towrite += b.u8string();
-				//}
-
-				towrite += fname.u8string();
-				towrite += "\r\n";
+				
 			}
-
+			catch(const BitException& e){
+				std::cout << "taihen in archive open: " << e.what() << "\n";
+			}
+			std::cout << towrite << "\n";
 			return towrite;
+			
 		}
 
 
@@ -111,7 +126,14 @@ int64_t get_filesize_complete(fs::path& path) {
 			BitArchiveInfo arc{ lib, wide_old_curr_path, BitFormat::Auto };
 
 			for (const auto& a : arc.items()) {
-				if (a.name() == wide_curr_fname) {
+				std::string path;
+				for (const auto& b : fs::path(a.path())) {
+					path += "__";
+					path += b.u8string();
+				}
+				//path += fs::path(a.name()).u8string();
+
+				if (path == e.u8string()) {
 					return a.size();
 				}
 			}
@@ -125,6 +147,8 @@ int64_t get_filesize_complete(fs::path& path) {
 void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto_offset) {
 	fs::path curr = "";
 	fs::path before_curr = "";
+
+	data.clear();
 
 	const Bit7zLibrary lib{ L"7z.dll" };
 
@@ -140,7 +164,15 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 			BitArchiveInfo arc{ lib, wide_old_curr_path, BitFormat::Auto };
 
 			for (const auto& a : arc.items()) {
-				if (a.name() == wide_curr_fname) {
+
+				std::string path;
+				for (const auto& b : fs::path(a.path())) {
+					path += "__";
+					path += b.u8string();
+				}
+				//path += fs::path(a.name()).u8string();
+
+				if (path == e.u8string()) {
 					BitExtractor extractor{ lib, BitFormat::Auto };
 					try {
 						extractor.extract(wide_old_curr_path, data, a.index());
@@ -151,6 +183,7 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 					return;
 				}
 			}
+
 		}
 		before_curr /= e;
 	}
@@ -228,7 +261,7 @@ public:
 	session(tcp::socket socket, asio::io_context& context, const std::string& root_path) : _context(context), _socket(std::move(socket)), _data_acceptor(context), disk_root_path(root_path) {}
 
 	~session() {
-		std::cout << "oh no session died\n";
+		std::cout << "oh no session got destructed\n";
 	}
 
 	void start() {
@@ -267,21 +300,21 @@ public:
 					}
 				}
 				else {
-					std::cout << "error: " << ec.message() << "\n";
+					std::cout << "error in command write: " << ec.message() << "\n";
 				}
 			});
 	}
 
-	void deliver_data(tcp::socket& data_socket, const std::string& data) {
+	void deliver_data(tcp::socket data_socket, const std::string& data) {
 		std::vector<uint8_t> dat;
 		dat.resize(data.size());
 		memcpy(dat.data(), data.data(), data.size());
-		deliver_data(data_socket, dat);
+		deliver_data(std::move(data_socket), dat);
 	}
 
-	void deliver_data(tcp::socket& data_socket, std::vector<uint8_t>& data) {
+	void deliver_data(tcp::socket data_socket, std::vector<uint8_t> data) {
 		bool writing = !_data_queue.empty();
-		_data_queue.push_back({ data_socket, data });
+		_data_queue.push_back({ std::move(data_socket), std::move(data) });
 		if (!writing) {
 			do_data_write();
 		}
@@ -292,12 +325,31 @@ public:
 
 		//getting a headache from the async not working, so this'll have to do
 		try {
-			asio::write(_data_queue.front().first, asio::buffer(_data_queue.front().second.data(), _data_queue.front().second.size()));
+			/*asio::write(_data_queue.front().first, asio::buffer(_data_queue.front().second.data(), _data_queue.front().second.size()));
 			_data_queue.pop_front();
 			deliver(assembleResponse(FTPCode::CLOSING_DATA_CONNECTION, "closing data connection, transmission succeeded"));
 			if (!_data_queue.empty()) {
 				do_data_write();
-			}
+			}*/
+
+			asio::async_write(_data_queue.front().first, asio::buffer(_data_queue.front().second.data(), _data_queue.front().second.size()),
+				[this, self](std::error_code ec, size_t len) {
+					if (!ec) {
+						//_data_queue.front().first.close();
+						_data_queue.pop_front();
+						//std::cout << "did data write\n";
+						deliver(assembleResponse(FTPCode::CLOSING_DATA_CONNECTION, "closing data connection, transmission succeeded"));
+
+						if (!_data_queue.empty()) {
+							do_data_write();
+						}
+					}
+					else {
+						_alive = false;
+						_data_queue.clear();
+						std::cout << "error in data write: " << ec.message() << "\n";
+					}
+				});
 		}
 		catch (std::system_error& e) {
 			std::cout << "taihen: " << e.what() << "\n";
@@ -437,8 +489,18 @@ public:
 							virtual_curr_path = virtual_curr_path.parent_path();
 							deliver(assembleResponse(FTPCode::OKAY, "todo: check if there is a parent path"));
 						}
+						else if (std::strstr(strstr.c_str(), "QUIT")) {
+							_socket.close();
+							_data_queue.clear();
+							_alive = false;
+							return;
+							//deliver(assembleResponse(FTPCode::OKAY, "todo: check if there is a parent path"));
+						}
 						else if (std::strstr(strstr.c_str(), "ABOR")) {
 							deliver(assembleResponse(FTPCode::OKAY, "we don't actually abort shit since we can't"));
+							for (int i = 0; i < _data_queue.size(); i++) {
+								_data_queue[i].second.resize(0);
+							}
 						}
 						else if (std::strstr(strstr.c_str(), "SYST")) {
 							deliver(assembleResponse(FTPCode::OKAY, "UNIX Type: L8"));
@@ -465,7 +527,7 @@ public:
 
 									}
 									//std::cout << "did write of directory listing: " << fs::u8path(towrite).u8string() << "\n";*/
-									deliver_data(socket, towrite);
+									deliver_data(std::move(socket), towrite);
 								}
 							);
 						}
@@ -500,7 +562,7 @@ public:
 									read_file_complete(towrite, path_to_get, rest);
 									rest = -1;
 
-									deliver_data(socket, towrite);
+									deliver_data(std::move(socket), std::move(towrite));
 
 									/*std::ifstream ifile(wide, std::ios::binary | std::ios::ate);
 									if (!ifile.bad()) {
@@ -562,15 +624,20 @@ public:
 			});
 	}
 
+	bool alive() {
+		return _alive;
+	}
 
 private:
-	std::deque<std::pair<tcp::socket&, std::vector<uint8_t>&>> _data_queue;
+	std::deque<std::pair<tcp::socket, std::vector<uint8_t>>> _data_queue;
 	tcp::socket _socket;
 	std::string _message;
 	message_queue _queue;
 	asio::streambuf _response;
 	tcp::acceptor _data_acceptor;
 	asio::io_context& _context;
+
+	bool _alive = true;
 
 	int64_t rest = -1;
 
@@ -584,12 +651,29 @@ public:
 		do_accept();
 	}
 
+	void do_garbage() {
+		std::list<std::shared_ptr<session>>::iterator i = _sessions.begin();
+		while (i != _sessions.end())
+		{
+			if (!(*i)->alive())
+			{
+				i = _sessions.erase(i);
+			}
+			else
+			{
+				i++;
+			}
+		}
+	}
+
 	void do_accept() {
 		_acceptor.async_accept(
 			[this](std::error_code ec, tcp::socket socket) {
 				if (!ec) {
-					_sessions.emplace_back(std::make_shared<session>(std::move(socket), _context, _root_path))->start();
+					_sessions.emplace_front(std::make_shared<session>(std::move(socket), _context, _root_path))->start();
 				}
+
+				do_garbage();
 
 				do_accept();
 			}
@@ -598,7 +682,7 @@ public:
 
 private:
 	std::string _root_path = "";
-	std::vector<std::shared_ptr<session>> _sessions;
+	std::list<std::shared_ptr<session>> _sessions;
 	asio::io_context& _context;
 	tcp::acceptor _acceptor;
 };
