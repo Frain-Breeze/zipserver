@@ -33,17 +33,6 @@ std::string list_complete(fs::path& path) {
 		const std::wstring wide_curr_fname = converter.from_bytes(e.u8string());
 		const std::wstring wide_curr_path = converter.from_bytes(curr.u8string());
 
-		/*BitArchiveInfo* arc = nullptr;
-		try {
-			//if (e.extension().u8string() == "zip" || e.extension().u8string() == ".zip") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::Zip }; }
-			//if (e.extension().u8string() == "rar" || e.extension().u8string() == ".rar") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::Rar5 }; }
-			//if (e.extension().u8string() == "7z" || e.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::SevenZip }; }
-		}
-		catch (const BitException& ex) {
-			std::cout << ex.what() << "\n";
-			return towrite;
-		}*/
-
 		const auto extt = e.extension().u8string();
 
 		if (extt == ".7z" || extt == ".rar" || extt == ".zip" ) {
@@ -51,15 +40,12 @@ std::string list_complete(fs::path& path) {
 
 
 			for (const auto& a : arc.items()) {
-				//std::wcout << a.name() << L", " << a.path() << L"\n";
 
 				fs::path fname = a.name();
 
 				const auto ext = fname.extension().u8string();
 				//we only go one archive layer deep, so we don't need to patch it here
-				//if (ext == ".zip" || ext == ".rar" || ext == ".7z") {
-				//	towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
-				//}
+
 				if (!a.isDir()) {
 					towrite += "Type=file;Size=" + std::to_string(a.size()) + ";Modify=17070101010101.000;Perm=r; ";
 				}
@@ -119,13 +105,6 @@ int64_t get_filesize_complete(fs::path& path) {
 		const std::wstring wide_curr_fname = converter.from_bytes(e.u8string());
 		const std::wstring wide_old_curr_path = converter.from_bytes(before_curr.u8string());
 
-		/*BitArchiveInfo* arc = nullptr;
-		int format = 0;
-
-		if (before_curr.extension().u8string() == "zip" || before_curr.extension().u8string() == ".zip") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::Zip }; format = 0; }
-		if (before_curr.extension().u8string() == "rar" || before_curr.extension().u8string() == ".rar") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::Rar5 }; format = 1; }
-		if (before_curr.extension().u8string() == "7z" || before_curr.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::SevenZip }; format = 2; }*/
-
 		const auto extt = before_curr.extension().u8string();
 
 		if (extt == ".zip" || extt == ".rar" || extt == ".7z") {
@@ -154,13 +133,6 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 		const std::wstring wide_curr_fname = converter.from_bytes(e.u8string());
 		const std::wstring wide_old_curr_path = converter.from_bytes(before_curr.u8string());
-
-		/*BitArchiveInfo* arc = nullptr;
-		int format = -1;
-
-		if (before_curr.extension().u8string() == "zip" || before_curr.extension().u8string() == ".zip") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::Zip }; format = 0; }
-		if (before_curr.extension().u8string() == "rar" || before_curr.extension().u8string() == ".rar") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::Rar5 }; format = 1; }
-		if (before_curr.extension().u8string() == "7z" || before_curr.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::SevenZip }; format = 2; }*/
 
 		const auto extt = before_curr.extension().u8string();
 
