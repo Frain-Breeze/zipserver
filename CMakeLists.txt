@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_executable("zipserver"
 	"src/main.cpp"
+	"src/ftp_server.cpp"
 )
 add_definitions(-DBIT7Z_AUTO_FORMAT)
 target_include_directories("zipserver" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/inc")

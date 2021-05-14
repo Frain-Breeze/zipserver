@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
 		try {
 			asio::io_context io_context;
 			tcp::endpoint endp(tcp::v4(), port);
-			server ser(io_context, endp, argv[2]);
+			Server ser(io_context, endp, argv[2]);
 			printf("server started on port %d with root folder %s\n", port, argv[2]);
 			io_context.run();
 		}
