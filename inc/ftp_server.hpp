@@ -33,20 +33,24 @@ std::string list_complete(fs::path& path) {
 		const std::wstring wide_curr_fname = converter.from_bytes(e.u8string());
 		const std::wstring wide_curr_path = converter.from_bytes(curr.u8string());
 
-		BitArchiveInfo* arc = nullptr;
+		/*BitArchiveInfo* arc = nullptr;
 		try {
-			if (e.extension().u8string() == "zip" || e.extension().u8string() == ".zip") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::Zip }; }
-			if (e.extension().u8string() == "rar" || e.extension().u8string() == ".rar") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::Rar5 }; }
-			if (e.extension().u8string() == "7z" || e.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::SevenZip }; }
+			//if (e.extension().u8string() == "zip" || e.extension().u8string() == ".zip") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::Zip }; }
+			//if (e.extension().u8string() == "rar" || e.extension().u8string() == ".rar") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::Rar5 }; }
+			//if (e.extension().u8string() == "7z" || e.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_curr_path, BitFormat::SevenZip }; }
 		}
 		catch (const BitException& ex) {
 			std::cout << ex.what() << "\n";
 			return towrite;
-		}
-		
+		}*/
 
-		if (arc != nullptr) {
-			for (const auto& a : arc->items()) {
+		const auto extt = e.extension().u8string();
+
+		if (extt == ".7z" || extt == ".rar" || extt == ".zip" ) {
+			BitArchiveInfo arc{ lib, wide_curr_path, BitFormat::Auto };
+
+
+			for (const auto& a : arc.items()) {
 				//std::wcout << a.name() << L", " << a.path() << L"\n";
 
 				fs::path fname = a.name();
@@ -75,7 +79,7 @@ std::string list_complete(fs::path& path) {
 			return towrite;
 		}
 
-		
+
 	}
 	//if we get here, it's not an archive we support
 	try {
@@ -95,75 +99,12 @@ std::string list_complete(fs::path& path) {
 			towrite += "\r\n";
 		}
 	}
-	catch (fs::filesystem_error& e){
+	catch (fs::filesystem_error& e) {
 		std::cout << "taihen: " << e.what() << "\n";
 	}
-	
+
 
 	return towrite;
-}
-
-bool is_valid_fake_directory(fs::path& path) {
-	fs::path curr = "";
-
-	std::vector<BitArchiveItem> previous_items;
-
-	for (const auto& e : path) {
-		curr /= e;
-
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-		const std::wstring wide_curr_fname = converter.from_bytes(e.u8string());
-
-		if (!previous_items.empty()) {
-			bool valid = false;;
-			for (const auto a : previous_items) {
-				if (a.name() == wide_curr_fname) {
-					std::wcout << a.name();
-					std::cout << " did match " << e.u8string() << "\n";
-					valid = true;
-					break;
-				}
-				else {
-					std::wcout << a.name();
-					std::cout << " didn't match " << e.u8string() << "\n";
-				}
-			}
-			if (!valid) {
-				return false;
-			}
-		}
-
-		if (e.extension() == ".zip") {
-
-			previous_items.clear();
-			try {
-				const Bit7zLibrary lib{ L"7z.dll" };
-
-				const std::wstring wide = converter.from_bytes(curr.u8string());
-				BitArchiveInfo arc{ lib, wide, BitFormat::Zip };
-
-				for (const auto& a : arc.items()) {
-					previous_items.push_back(a);
-				}
-
-				/*std::wcout << L"Archive properties" << std::endl;
-				std::wcout << L" Items count: " << arc.itemsCount() << std::endl;
-				std::wcout << L" Folders count: " << arc.foldersCount() << std::endl;
-				std::wcout << L" Files count: " << arc.filesCount() << std::endl;
-				std::wcout << L" Size: " << arc.size() << std::endl;
-				std::wcout << L" Packed size: " << arc.packSize() << std::endl;
-				std::wcout << std::endl;*/
-
-			}
-			catch (const BitException& ex) {
-				std::cout << ex.what();
-			}
-		}
-		else {
-			std::cout << "no known extension on file " << e.u8string() << "\n";
-		}
-	}
-	return true;
 }
 
 int64_t get_filesize_complete(fs::path& path) {
@@ -178,27 +119,28 @@ int64_t get_filesize_complete(fs::path& path) {
 		const std::wstring wide_curr_fname = converter.from_bytes(e.u8string());
 		const std::wstring wide_old_curr_path = converter.from_bytes(before_curr.u8string());
 
-		BitArchiveInfo* arc = nullptr;
+		/*BitArchiveInfo* arc = nullptr;
 		int format = 0;
 
 		if (before_curr.extension().u8string() == "zip" || before_curr.extension().u8string() == ".zip") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::Zip }; format = 0; }
 		if (before_curr.extension().u8string() == "rar" || before_curr.extension().u8string() == ".rar") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::Rar5 }; format = 1; }
-		if (before_curr.extension().u8string() == "7z" || before_curr.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::SevenZip }; format = 2; }
+		if (before_curr.extension().u8string() == "7z" || before_curr.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::SevenZip }; format = 2; }*/
 
-		if (arc != nullptr) {
+		const auto extt = before_curr.extension().u8string();
 
-			for (const auto& a : arc->items()) {
+		if (extt == ".zip" || extt == ".rar" || extt == ".7z") {
+			BitArchiveInfo arc{ lib, wide_old_curr_path, BitFormat::Auto };
+
+			for (const auto& a : arc.items()) {
 				if (a.name() == wide_curr_fname) {
 					return a.size();
 				}
 			}
-			delete arc;
 		}
 		before_curr /= e;
 	}
 	//if we get here, it must be a normal file
 
-	
 	return fs::file_size(path);
 }
 void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto_offset) {
@@ -213,35 +155,30 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 		const std::wstring wide_curr_fname = converter.from_bytes(e.u8string());
 		const std::wstring wide_old_curr_path = converter.from_bytes(before_curr.u8string());
 
-		BitArchiveInfo* arc = nullptr;
+		/*BitArchiveInfo* arc = nullptr;
 		int format = -1;
 
 		if (before_curr.extension().u8string() == "zip" || before_curr.extension().u8string() == ".zip") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::Zip }; format = 0; }
 		if (before_curr.extension().u8string() == "rar" || before_curr.extension().u8string() == ".rar") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::Rar5 }; format = 1; }
-		if (before_curr.extension().u8string() == "7z" || before_curr.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::SevenZip }; format = 2; }
+		if (before_curr.extension().u8string() == "7z" || before_curr.extension().u8string() == ".7z") { arc = new BitArchiveInfo{ lib, wide_old_curr_path, BitFormat::SevenZip }; format = 2; }*/
 
-		if (arc != nullptr) {
-			
-			for (const auto& a : arc->items()) {
+		const auto extt = before_curr.extension().u8string();
+
+		if (extt == ".zip" || extt == ".rar" || extt == ".7z") {
+			BitArchiveInfo arc{ lib, wide_old_curr_path, BitFormat::Auto };
+
+			for (const auto& a : arc.items()) {
 				if (a.name() == wide_curr_fname) {
-					BitExtractor* extractor = nullptr;
-					if (format == 0) { extractor = new BitExtractor{ lib, BitFormat::Zip }; }
-					if (format == 1) { extractor = new BitExtractor{ lib, BitFormat::Rar5 }; }
-					if (format == 2) { extractor = new BitExtractor{ lib, BitFormat::SevenZip }; }
-					if (extractor != nullptr) {
-						try {
-							extractor->extract(wide_old_curr_path, data, a.index());
-						}
-						catch (BitException& e) {
-							std::cout << "taihen in file extract: " << e.what() << "\n";
-						}
-						delete extractor;
+					BitExtractor extractor{ lib, BitFormat::Auto };
+					try {
+						extractor.extract(wide_old_curr_path, data, a.index());
 					}
-					delete arc;
+					catch (BitException& e) {
+						std::cout << "taihen in file extract: " << e.what() << "\n";
+					}
 					return;
 				}
 			}
-			delete arc;
 		}
 		before_curr /= e;
 	}
@@ -250,21 +187,24 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 	const std::wstring wide_curr_path = converter.from_bytes(path.u8string());
 
-	std::ifstream ifile(wide_curr_path, std::ios::binary | std::ios::ate);
-	if (!ifile.bad()) {
-		std::streamoff fsize = ifile.tellg();
-		ifile.seekg(0, std::ios::beg);
-		if (goto_offset != -1) {
-			fsize -= goto_offset;
-			ifile.seekg(goto_offset, std::ios::beg);
+	try {
+		std::ifstream ifile(wide_curr_path, std::ios::binary | std::ios::ate);
+		if (!ifile.bad()) {
+			std::streamoff fsize = ifile.tellg();
+			ifile.seekg(0, std::ios::beg);
+			if (goto_offset != -1) {
+				fsize -= goto_offset;
+				ifile.seekg(goto_offset, std::ios::beg);
+			}
+			data.resize(fsize);
+			ifile.read((char*)data.data(), fsize);
+			ifile.close();
+			return;
 		}
-		data.resize(fsize);
-		ifile.read((char*)data.data(), fsize);
-		ifile.close();
-		return;
 	}
-	
-	std::cout << "BADDD\n\n";
+	catch (std::exception& e) {
+		std::cout << "taihen in file read: " << e.what() << "\n";
+	}
 }
 
 enum class FTPCode : uint16_t {
@@ -321,7 +261,7 @@ public:
 
 	void start() {
 		std::cout << "started session with " << _socket.remote_endpoint() << "\n";
-		
+
 		deliver(assembleResponse(FTPCode::READY, "server ready"));
 
 		do_read();
@@ -369,7 +309,7 @@ public:
 
 	void deliver_data(tcp::socket& data_socket, std::vector<uint8_t>& data) {
 		bool writing = !_data_queue.empty();
-		_data_queue.push_back({data_socket, data});
+		_data_queue.push_back({ data_socket, data });
 		if (!writing) {
 			do_data_write();
 		}
@@ -390,7 +330,7 @@ public:
 		catch (std::system_error& e) {
 			std::cout << "taihen: " << e.what() << "\n";
 		}
-		
+
 
 		/*asio::async_write(_data_queue.front().first, asio::buffer(_data_queue.front().second->data(), _data_queue.front().second->size()),
 			[this, self](std::error_code ec, size_t len) {
@@ -407,7 +347,7 @@ public:
 				}
 			});*/
 	}
-	
+
 
 	void do_read() {
 		auto self(shared_from_this());
@@ -453,7 +393,7 @@ public:
 							else {
 								deliver(assembleResponse(FTPCode::OKAY, "set file pos"));
 							}
-							
+
 						}
 						else if (std::strstr(strstr.c_str(), "SIZE")) {
 							fs::path assembled = fs::u8path(disk_root_path.u8string());
@@ -464,7 +404,7 @@ public:
 							}
 							assembled /= fs::u8path(bbuf);
 							//std::cout << "file thing: " << assembled << "\n";
-							
+
 							if (fs::is_regular_file(assembled)) {
 								deliver(assembleResponse(FTPCode::FILE_STATUS, std::to_string(fs::file_size(assembled))));
 							}
@@ -550,7 +490,7 @@ public:
 
 									/*for (const auto& e : fs::directory_iterator(path_to_list)) {
 
-										
+
 									}
 									//std::cout << "did write of directory listing: " << fs::u8path(towrite).u8string() << "\n";*/
 									deliver_data(socket, towrite);
@@ -587,7 +527,7 @@ public:
 									std::vector<uint8_t> towrite;
 									read_file_complete(towrite, path_to_get, rest);
 									rest = -1;
-									
+
 									deliver_data(socket, towrite);
 
 									/*std::ifstream ifile(wide, std::ios::binary | std::ios::ate);
@@ -603,7 +543,7 @@ public:
 									else {
 										std::cout << "file read failed!\n";
 									}*/
-									
+
 								}
 							);
 						}
@@ -643,14 +583,14 @@ public:
 						deliver(assembleResponse(FTPCode::COMMAND_NOT_IMPLEMENTED, "wher command? >:"));
 					}
 
-					
+
 				}
 
 				do_read();
 			});
 	}
 
-	
+
 private:
 	std::deque<std::pair<tcp::socket&, std::vector<uint8_t>&>> _data_queue;
 	tcp::socket _socket;

@@ -1,6 +1,5 @@
 #define ASIO_STANDALONE
 #include <asio.hpp>
-#include "ftp_connection.hpp"
 #include <iostream>
 #include "ftp_server.hpp"
 
@@ -31,11 +30,4 @@ int main(int argc, char* argv[]) {
 		printf("not enough arguments, or too many! we need 2, we have %d\n", argc - 1);
 		std::cin.ignore();
 	}
-
-	
-	//Ftpconn conn;
-	//conn.connect("192.168.68.108", 6760);
-	//while (true) {
-	//	std::cout << conn.readLine() << "\n";
-	//}
 }
