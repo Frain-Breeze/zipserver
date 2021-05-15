@@ -14,16 +14,16 @@ int main(int argc, char* argv[]) {
 			return -1;
 		}
 
-		try {
+		//try {
 			asio::io_context io_context;
 			tcp::endpoint endp(tcp::v4(), port);
 			Server ser(io_context, endp, argv[2]);
 			printf("server started on port %d with root folder %s\n", port, argv[2]);
 			io_context.run();
-		}
-		catch (const std::system_error& e) {
-			printf("error: %s", e.what());
-		}
+		//}
+		//catch (const std::system_error& e) {
+		//	printf("error: %s", e.what());
+		//}
 		
 	}
 	else {

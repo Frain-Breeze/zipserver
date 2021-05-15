@@ -32,6 +32,17 @@ public:
 
 	bool alive() { return _alive; }
 
+	//commands
+	void comm_user(const std::string& input);
+	void comm_pwd(const std::string& input);
+	void comm_cwd(const std::string& input);
+	void comm_pasv(const std::string& input);
+	void comm_type(const std::string& input);
+	void comm_size(const std::string& input);
+	void comm_retr(const std::string& input);
+	void comm_quit(const std::string& input);
+	void comm_mlsd_list(const std::string& input);
+
 private:
 	std::deque<std::pair<tcp::socket, std::vector<uint8_t>>> _data_queue;
 	tcp::socket _socket;
