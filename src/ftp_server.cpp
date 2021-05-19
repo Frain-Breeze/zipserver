@@ -1,5 +1,6 @@
 #include "ftp_server.hpp"
-#include "ftp_codes.hpp"
+#include "ftp_response.hpp"
+#include "ftp_command_retr.hpp"
 
 #include <asio.hpp>
 #include <iostream>
@@ -24,7 +25,7 @@ using namespace bit7z;
 
 namespace fs = std::filesystem;
 
-std::string list_complete(fs::path& path) {
+std::string list_complete(fs::path& path, bool metadata, bool unix) {
 	fs::path curr = "";
 	fs::path before_curr = "";
 
@@ -61,7 +62,14 @@ std::string list_complete(fs::path& path) {
 					//we only go one archive layer deep, so we don't need to patch it here
 
 					if (!a.isDir()) {
-						towrite += "Type=file;Size=" + std::to_string(a.size()) + ";Modify=17070101010101.000;Perm=r; ";
+						if (metadata) {
+							if (unix) {
+								towrite += "-r-------- 1 loli loli " + std::to_string(a.size()) + " Jan 1 1707 ";
+							}
+							else {
+								towrite += "Type=file;Size=" + std::to_string(a.size()) + ";Modify=17070101010101.000;Perm=r; ";
+							}
+						}
 
 						for (const auto& b : fs::path(a.path())) {
 							towrite += "__";
@@ -74,40 +82,43 @@ std::string list_complete(fs::path& path) {
 					//else if (a.isDir()) {
 					//	towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
 					//}
-
-
-
-
-
-					//towrite += fname.u8string();
 				}
-
-
 			}
 			catch (const BitException& e) {
 				std::cout << "taihen in archive open: " << e.what() << "\n";
 			}
 			std::cout << towrite << "\n";
 			return towrite;
-
 		}
-
-
 	}
 	//if we get here, it's not an archive we support
 	try {
 		for (const auto& e : fs::directory_iterator(path)) {
 			const auto ext = e.path().extension().u8string();
-			if (ext == ".zip" || ext == ".rar" || ext == ".7z") {
-				towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
+			if (metadata) {
+				if (unix) {
+					if (ext == ".zip" || ext == ".rar" || ext == ".7z") {
+						towrite += "dr-------- 1 loli loli 0 Jan 1 1707 ";
+					}
+					else if (e.is_regular_file()) {
+						towrite += "-r-------- 1 loli loli " + std::to_string(e.file_size()) + " Jan 1 1707 ";
+					}
+					else if (e.is_directory()) {
+						towrite += "dr-------- 1 loli loli 0 Jan 1 1707 ";
+					}
+				}
+				else {
+					if (ext == ".zip" || ext == ".rar" || ext == ".7z") {
+						towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
+					}
+					else if (e.is_regular_file()) {
+						towrite += "Type=file;Size=" + std::to_string(e.file_size()) + ";Modify=17070101010101.000;Perm=r; ";
+					}
+					else if (e.is_directory()) {
+						towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
+					}
+				}
 			}
-			else if (e.is_regular_file()) {
-				towrite += "Type=file;Size=" + std::to_string(e.file_size()) + ";Modify=17070101010101.000;Perm=r; ";
-			}
-			else if (e.is_directory()) {
-				towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
-			}
-
 			towrite += e.path().filename().u8string();
 			towrite += "\r\n";
 		}
@@ -116,7 +127,7 @@ std::string list_complete(fs::path& path) {
 		std::cout << "taihen: " << e.what() << "\n";
 	}
 
-
+	std::cout << towrite << "\n";
 	return towrite;
 }
 
@@ -242,22 +253,6 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 
 
 
-void assembleResponse(std::string& ret_msg, FTPCode code, const std::string& message) {
-	ret_msg = std::to_string((int)code);
-	ret_msg += " ";
-	ret_msg += message;
-	ret_msg += "\r\n";
-}
-
-std::string assembleResponse(FTPCode code, const std::string& message) {
-	std::string ret;
-	assembleResponse(ret, code, message);
-	return ret;
-}
-
-
-
-
 Session::Session(tcp::socket socket, asio::io_context& context, const std::string& root_path) : _context(context), _socket(std::move(socket)), _data_acceptor(context), disk_root_path(root_path) {}
 
 Session::~Session() {
@@ -267,7 +262,7 @@ Session::~Session() {
 void Session::start() {
 	std::cout << "started session with " << _socket.remote_endpoint() << "\n";
 
-	deliver(assembleResponse(FTPCode::READY, "server ready"));
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_READY_NEW_USER, "server ready"));
 
 	do_read();
 }
@@ -331,7 +326,7 @@ void Session::do_data_write() {
 					//_data_queue.front().first.close();
 					_data_queue.pop_front();
 					//std::cout << "did data write\n";
-					deliver(assembleResponse(FTPCode::CLOSING_DATA_CONNECTION, "closing data connection, transmission succeeded"));
+					deliver(assembleResponse(FTPCode::POS_COMPLETE_CLOSING_DATA_CONNECTION, "closing data connection, transmission succeeded"));
 
 					if (!_data_queue.empty()) {
 						do_data_write();
@@ -349,53 +344,40 @@ void Session::do_data_write() {
 	}
 }
 
-
-
+void Session::comm_rest(const std::string& input) {
+	if (sscanf(input.c_str(), "%lld", &rest) == 1) {
+		deliver(assembleResponse(FTPCode::POS_MID_PENDING_FURTHER_INFO, (std::string)"set offset to " + std::to_string(rest)));
+	}
+	else {
+		deliver(assembleResponse(FTPCode::NEG_PERM_SYNTAX_ERROR, "couldn't parse REST command!"));
+	}
+}
 void Session::comm_user(const std::string& input) {
-	deliver(assembleResponse(FTPCode::GREETING, (std::string)"user logged in with username: " + input));
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_LOGGED_IN, (std::string)"user logged in with username: " + input));
 }
 void Session::comm_pwd(const std::string& input) {
-	deliver(assembleResponse(FTPCode::PATHNAME_CREATED, (std::string)"\"/" + virtual_curr_path.u8string() + "\""));
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_NAME_CREATED, (std::string)"\"/" + virtual_curr_path.u8string() + "\""));
 }
 void Session::comm_type(const std::string& input) {
-	deliver(assembleResponse(FTPCode::OKAY, "we didn't actually change mode but it's always in binary anyways"));
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_SUCCESS, "we didn't actually change mode but it's always in binary anyways"));
+}
+void Session::comm_syst(const std::string& input) {
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_NAME_SYSTEM_TYPE, "UNIX Type: L8"));
 }
 void Session::comm_quit(const std::string& input) {
 	_alive = false;
 	_data_queue.clear();
-	deliver(assembleResponse(FTPCode::OKAY, "set session to inactive"));
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_SUCCESS, "set session to inactive"));
 	_socket.close();
 }
-void Session::comm_retr(const std::string& input) {
-	
-	std::string iinput = input;
-	
-	if (input.find_first_of('/') == 0) {
-		iinput = input.substr(1, std::string::npos);
-	}
-
-	fs::path diskroot = disk_root_path;
-	fs::path virtpath = virtual_curr_path;
-
-	deliver(assembleResponse(FTPCode::GOING_TO_OPEN_DATA_CONNECTION, "gonna open data conn to send file"));
-
-	auto self(shared_from_this());
-	_data_acceptor.async_accept(
-		[this, self, diskroot, virtpath, iinput](std::error_code ec, tcp::socket socket) {
-			fs::path path_to_get = diskroot;
-			path_to_get /= virtpath;
-			path_to_get /= fs::u8path(iinput);
-			//std::cout << "path thing: " << diskroot.u8string() << " " << virtpath.u8string() << " " << path_to_get.u8string() << "\n";
-
-			std::u16string wide = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(path_to_get.u8string());
-
-			std::vector<uint8_t> towrite;
-			read_file_complete(towrite, path_to_get, rest);
-			rest = -1;
-
-			deliver_data(std::move(socket), std::move(towrite));
-		}
-	);
+void Session::comm_feat(const std::string& input) {
+	deliver("211- extensions supported:\r\n UTF8\r\n MLSD\r\n211 end.\r\n");
+}
+void Session::comm_opts(const std::string& input) {
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_SUCCESS, "didn't actually check the option but it should be okay"));
+}
+void Session::comm_noop(const std::string& input) {
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_SUCCESS, "succesfully did absolutely nothing"));
 }
 void Session::comm_size(const std::string& input) {
 	fs::path assembled = fs::u8path(disk_root_path.u8string());
@@ -404,22 +386,22 @@ void Session::comm_size(const std::string& input) {
 	//std::cout << "file thing: " << assembled << "\n";
 
 	if (fs::is_regular_file(assembled)) {
-		deliver(assembleResponse(FTPCode::FILE_STATUS, std::to_string(fs::file_size(assembled))));
+		deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_STATUS, std::to_string(fs::file_size(assembled))));
 	}
 	else {
 		try {
-			deliver(assembleResponse(FTPCode::FILE_STATUS, std::to_string(get_filesize_complete(assembled))));
+			deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_STATUS, std::to_string(get_filesize_complete(assembled))));
 		}
 		catch (fs::filesystem_error& e) {
-			deliver(assembleResponse(FTPCode::ACTION_NOT_TAKEN_UNAVAILABLE, "can't get filesize of file"));
+			deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "can't get filesize of file"));
 		}
 	}
 }
-void Session::comm_mlsd_list(const std::string& input) {
+void Session::comm_nlst(const std::string& input) {
 	fs::path diskroot = disk_root_path;
-	fs::path virtpath = virtual_curr_path;
+	fs::path virtpath = (input == "") ? virtual_curr_path : fs::u8path(input);
 
-	deliver(assembleResponse(FTPCode::GOING_TO_OPEN_DATA_CONNECTION, "gonna open data conn"));
+	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to list directory contents, without metadata"));
 
 	auto self(shared_from_this());
 	_data_acceptor.async_accept(
@@ -427,12 +409,45 @@ void Session::comm_mlsd_list(const std::string& input) {
 			fs::path path_to_list = diskroot;
 			path_to_list /= virtpath;
 			//std::cout << "path thing root: " << diskroot.u8string() << " virtual: " << virtpath.u8string() << " combined: "<< path_to_list.u8string() << "\n";
-			std::string towrite = list_complete(path_to_list);
+			std::string towrite = list_complete(path_to_list, false, false);
 			deliver_data(std::move(socket), towrite);
 		}
 	);
+}
+void Session::comm_mlsd(const std::string& input) {
+	fs::path diskroot = disk_root_path;
+	fs::path virtpath = virtual_curr_path;
 
-	//deliver(assembleResponse(FTPCode::OKAY, "we didn't actually change mode but it's always in binary anyways"));
+	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to list directory contents, with metadata"));
+
+	auto self(shared_from_this());
+	_data_acceptor.async_accept(
+		[this, self, diskroot, virtpath](std::error_code ec, tcp::socket socket) {
+			fs::path path_to_list = diskroot;
+			path_to_list /= virtpath;
+			//std::cout << "path thing root: " << diskroot.u8string() << " virtual: " << virtpath.u8string() << " combined: "<< path_to_list.u8string() << "\n";
+			std::string towrite = list_complete(path_to_list, true, false);
+			deliver_data(std::move(socket), towrite);
+		}
+	);
+}
+
+void Session::comm_list(const std::string& input) {
+	fs::path diskroot = disk_root_path;
+	fs::path virtpath = virtual_curr_path;
+
+	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to list directory contents, with metadata"));
+
+	auto self(shared_from_this());
+	_data_acceptor.async_accept(
+		[this, self, diskroot, virtpath](std::error_code ec, tcp::socket socket) {
+			fs::path path_to_list = diskroot;
+			path_to_list /= virtpath;
+			//std::cout << "path thing root: " << diskroot.u8string() << " virtual: " << virtpath.u8string() << " combined: "<< path_to_list.u8string() << "\n";
+			std::string towrite = list_complete(path_to_list, true, true);
+			deliver_data(std::move(socket), towrite);
+		}
+	);
 }
 void Session::comm_cwd(const std::string& input) {
 	if (input.size() > 0) {
@@ -442,11 +457,10 @@ void Session::comm_cwd(const std::string& input) {
 		else {
 			virtual_curr_path /= fs::u8path(input);
 		}
-		deliver(assembleResponse(FTPCode::OKAY, (std::string)"\"" + virtual_curr_path.u8string() + "\""));
+		deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_ACTION_OKAY, (std::string)"\"" + virtual_curr_path.u8string() + "\""));
 		return;
 	}
-	deliver(assembleResponse(FTPCode::SYNTAX_ERROR_IN_COMMAND, "you need to provide an argument to change the directory to"));
-	//deliver(assembleResponse(FTPCode::PATHNAME_CREATED, (std::string)"\"/" + virtual_curr_path.u8string() + "\""));
+	deliver(assembleResponse(FTPCode::NEG_PERM_SYNTAX_ERROR, "you need to provide an argument to change the directory to"));
 }
 void Session::comm_pasv(const std::string& input) {
 	if (_data_acceptor.is_open()) {
@@ -469,7 +483,7 @@ void Session::comm_pasv(const std::string& input) {
 	}
 	stream << ((port >> 8) & 0xff) << "," << (port & 0xff) << ")";
 
-	deliver(assembleResponse(FTPCode::ENTERING_PASV_MODE, stream.str()));
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_ENTER_PASV, stream.str()));
 }
 
 void Session::do_read() {
@@ -485,11 +499,17 @@ void Session::do_read() {
 					{"cwd ", std::bind(&Session::comm_cwd, this, std::placeholders::_1)},
 					{"pasv", std::bind(&Session::comm_pasv, this, std::placeholders::_1)},
 					{"type", std::bind(&Session::comm_type, this, std::placeholders::_1)},
-					{"mlsd", std::bind(&Session::comm_mlsd_list, this, std::placeholders::_1)},
-					{"list", std::bind(&Session::comm_mlsd_list, this, std::placeholders::_1)},
+					{"mlsd", std::bind(&Session::comm_mlsd, this, std::placeholders::_1)},
+					{"list", std::bind(&Session::comm_list, this, std::placeholders::_1)},
 					{"size", std::bind(&Session::comm_size, this, std::placeholders::_1)},
 					{"retr", std::bind(&Session::comm_retr, this, std::placeholders::_1)},
 					{"quit", std::bind(&Session::comm_quit, this, std::placeholders::_1)},
+					{"rest", std::bind(&Session::comm_rest, this, std::placeholders::_1)},
+					{"feat", std::bind(&Session::comm_feat, this, std::placeholders::_1)},
+					{"opts", std::bind(&Session::comm_opts, this, std::placeholders::_1)},
+					{"syst", std::bind(&Session::comm_syst, this, std::placeholders::_1)},
+					{"noop", std::bind(&Session::comm_noop, this, std::placeholders::_1)},
+					{"nlst", std::bind(&Session::comm_nlst, this, std::placeholders::_1)},
 				};
 
 				std::istream respstream(&_response);
@@ -517,11 +537,11 @@ void Session::do_read() {
 
 				const auto found_func = commands.find(char_comm);
 				if (found_func != commands.end()) {
-					const std::string para = msg.substr(first_space + 1, std::string::npos);
+					const std::string para = (first_space == std::string::npos) ? "" : msg.substr(first_space + 1, std::string::npos);
 					found_func->second(para);
 				}
 				else {
-					deliver(assembleResponse(FTPCode::UNKNOWN_COMMAND, "command not in list of implemented commands"));
+					deliver(assembleResponse(FTPCode::NEG_PERM_SYNTAX_ERROR, "command not in list of implemented commands"));
 				}
 			}
 			else {
@@ -532,257 +552,6 @@ void Session::do_read() {
 		}
 	);
 }
-
-//void Session::do_read() {
-//	auto self(shared_from_this());
-//	asio::async_read_until(_socket, _response, "\r\n",
-//		[this, self](std::error_code ec, size_t len) {
-//			if (!ec) {
-//				std::istream respstream(&_response);
-//				std::string strstr;
-//				std::getline(respstream, strstr);
-//
-//				SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 9);
-//				std::cout << _socket.remote_endpoint() << " -> local: " << strstr << "\n";
-//				SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 15);
-//
-//				if (strstr.size() >= 4) {
-//					if (std::strstr(strstr.c_str(), "FEAT")) {
-//						deliver("211- extensions supported:\r\n UTF8\r\n MLSD\r\n211 end.\r\n");
-//					}
-//					else if (std::strstr(strstr.c_str(), "OPTS")) {
-//						char bbuf[4096];
-//						if (sscanf(strstr.c_str(), "OPTS %[^\r]", bbuf) != 1) {
-//							std::strcpy(bbuf, "");
-//						}
-//						if (bbuf == (std::string)"UTF8") {
-//							//TODO:: actually do shit
-//						}
-//						deliver(assembleResponse(FTPCode::OKAY, "good"));
-//					}
-//					else if (std::strstr(strstr.c_str(), "USER")) {
-//						deliver(assembleResponse(FTPCode::GREETING, "user logged in (don't care about password)"));
-//					}
-//					else if (std::strstr(strstr.c_str(), "PASS")) {
-//						deliver(assembleResponse(FTPCode::GREETING, "got password, user logged in"));
-//					}
-//					else if (std::strstr(strstr.c_str(), "AUTH")) {
-//						deliver(assembleResponse(FTPCode::ACTION_NOT_TAKEN_UNAVAILABLE, "we don't do that here"));
-//					}
-//					else if (std::strstr(strstr.c_str(), "REST")) {
-//						if (sscanf(strstr.c_str(), "REST %lld", &rest) != 1) {
-//							rest = -1;
-//							deliver(assembleResponse(FTPCode::SYNTAX_ERROR_IN_COMMAND, "could not parse offset"));
-//						}
-//						else {
-//							deliver(assembleResponse(FTPCode::OKAY, "set file pos"));
-//						}
-//
-//					}
-//					else if (std::strstr(strstr.c_str(), "SIZE")) {
-//						fs::path assembled = fs::u8path(disk_root_path.u8string());
-//						assembled /= fs::u8path(virtual_curr_path.u8string());
-//						char bbuf[4096];
-//						if (sscanf(strstr.c_str(), "SIZE %[^\r]", bbuf) != 1) {
-//							std::strcpy(bbuf, "");
-//						}
-//						assembled /= fs::u8path(bbuf);
-//						//std::cout << "file thing: " << assembled << "\n";
-//
-//						if (fs::is_regular_file(assembled)) {
-//							deliver(assembleResponse(FTPCode::FILE_STATUS, std::to_string(fs::file_size(assembled))));
-//						}
-//						else {
-//							try {
-//								deliver(assembleResponse(FTPCode::FILE_STATUS, std::to_string(get_filesize_complete(assembled))));
-//							}
-//							catch (fs::filesystem_error& e) {
-//								deliver(assembleResponse(FTPCode::ACTION_NOT_TAKEN_UNAVAILABLE, "can't get filesize of file"));
-//							}
-//						}
-//					}
-//					else if (std::strstr(strstr.c_str(), "PWD")) {
-//						if (virtual_curr_path.u8string() == "") {
-//							deliver(assembleResponse(FTPCode::PATHNAME_CREATED, "\"/\""));
-//						}
-//						else {
-//							deliver(assembleResponse(FTPCode::PATHNAME_CREATED, (std::string)"\"/" + virtual_curr_path.u8string() + "\""));
-//						}
-//					}
-//					else if (std::strstr(strstr.c_str(), "CWD")) {
-//
-//						bool isRelative = true;
-//
-//						char bbuf[4096];
-//						if (sscanf(strstr.c_str(), "CWD %[^\r]", bbuf) == 1) {
-//							if (bbuf[0] == '/') {
-//								std::strcpy(bbuf, &bbuf[1]);
-//								isRelative = false;
-//							}
-//						}
-//						else {
-//							std::strcpy(bbuf, "");
-//						}
-//						//std::cout << "section : " << bbuf << "\n";
-//
-//						fs::path assembled_path = fs::u8path(disk_root_path.u8string());
-//						if (isRelative) { assembled_path /= virtual_curr_path; }
-//						assembled_path /= fs::u8path(bbuf);
-//
-//						//is_valid_fake_directory(assembled_path);
-//
-//						if (fs::is_directory(assembled_path) || true) {
-//							//std::cout << "folder " << fs::u8path(bbuf).u8string() << " is real, we will enter it";
-//							if (isRelative) {
-//								virtual_curr_path /= fs::u8path(bbuf);
-//							}
-//							else {
-//								virtual_curr_path = fs::u8path(bbuf);
-//							}
-//						}
-//						deliver(assembleResponse(FTPCode::OKAY, virtual_curr_path.u8string()));
-//					}
-//					else if (std::strstr(strstr.c_str(), "TYPE")) {
-//						deliver(assembleResponse(FTPCode::OKAY, "todo: actually switch type"));
-//					}
-//					else if (std::strstr(strstr.c_str(), "CDUP")) {
-//						virtual_curr_path = virtual_curr_path.parent_path();
-//						deliver(assembleResponse(FTPCode::OKAY, "todo: check if there is a parent path"));
-//					}
-//					else if (std::strstr(strstr.c_str(), "QUIT")) {
-//						_socket.close();
-//						_data_queue.clear();
-//						_alive = false;
-//						return;
-//						//deliver(assembleResponse(FTPCode::OKAY, "todo: check if there is a parent path"));
-//					}
-//					else if (std::strstr(strstr.c_str(), "ABOR")) {
-//						deliver(assembleResponse(FTPCode::OKAY, "we don't actually abort shit since we can't"));
-//						for (int i = 0; i < _data_queue.size(); i++) {
-//							_data_queue[i].second.resize(0);
-//						}
-//					}
-//					else if (std::strstr(strstr.c_str(), "SYST")) {
-//						deliver(assembleResponse(FTPCode::OKAY, "UNIX Type: L8"));
-//					}
-//					else if (std::strstr(strstr.c_str(), "MLSD") || std::strstr(strstr.c_str(), "LIST")) {
-//
-//						fs::path diskroot = disk_root_path;
-//						fs::path virtpath = virtual_curr_path;
-//
-//						deliver(assembleResponse(FTPCode::GOING_TO_OPEN_DATA_CONNECTION, "gonna open data conn"));
-//
-//						auto self(shared_from_this());
-//						_data_acceptor.async_accept(
-//							[this, self, diskroot, virtpath](std::error_code ec, tcp::socket socket) {
-//								fs::path path_to_list = diskroot;
-//								path_to_list /= virtpath;
-//								//std::cout << "path thing root: " << diskroot.u8string() << " virtual: " << virtpath.u8string() << " combined: "<< path_to_list.u8string() << "\n";
-//								std::string towrite;
-//
-//								towrite = list_complete(path_to_list);
-//
-//								/*for (const auto& e : fs::directory_iterator(path_to_list)) {
-//
-//
-//								}
-//								//std::cout << "did write of directory listing: " << fs::u8path(towrite).u8string() << "\n";*/
-//								deliver_data(std::move(socket), towrite);
-//							}
-//						);
-//					}
-//					else if (std::strstr(strstr.c_str(), "RETR")) {
-//
-//						char bbuf[4096];
-//						if (sscanf(strstr.c_str(), "RETR %[^\r]", bbuf) != 1) {
-//							std::strcpy(bbuf, "");
-//						}
-//						if (bbuf[0] == '/') {
-//							strcpy(bbuf, &bbuf[1]);
-//						}
-//
-//						//std::cout << "file to get: " << bbuf << "\n";
-//
-//						fs::path diskroot = disk_root_path;
-//						fs::path virtpath = virtual_curr_path;
-//
-//						deliver(assembleResponse(FTPCode::GOING_TO_OPEN_DATA_CONNECTION, "gonna open data conn to send file"));
-//
-//						auto self(shared_from_this());
-//						_data_acceptor.async_accept(
-//							[this, self, diskroot, virtpath, bbuf](std::error_code ec, tcp::socket socket) {
-//								fs::path path_to_get = diskroot;
-//								path_to_get /= virtpath;
-//								path_to_get /= fs::u8path(bbuf);
-//								//std::cout << "path thing: " << diskroot.u8string() << " " << virtpath.u8string() << " " << path_to_get.u8string() << "\n";
-//
-//								std::u16string wide = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(path_to_get.u8string());
-//
-//								std::vector<uint8_t> towrite;
-//								read_file_complete(towrite, path_to_get, rest);
-//								rest = -1;
-//
-//								deliver_data(std::move(socket), std::move(towrite));
-//
-//								/*std::ifstream ifile(wide, std::ios::binary | std::ios::ate);
-//								if (!ifile.bad()) {
-//									std::streamoff fsize = ifile.tellg();
-//									ifile.seekg(0, std::ios::beg);
-//									towrite.resize(fsize);
-//									ifile.read((char*)towrite.data(), fsize);
-//									ifile.close();
-//
-//									deliver_data(socket, towrite);
-//								}
-//								else {
-//									std::cout << "file read failed!\n";
-//								}*/
-//
-//							}
-//						);
-//					}
-//					else if (std::strstr(strstr.c_str(), "PASV")) {
-//
-//						if (_data_acceptor.is_open()) {
-//							_data_acceptor.close();
-//							//std::cout << "closed data acceptor\n";
-//						}
-//
-//						tcp::endpoint endp(tcp::v4(), 0);
-//						_data_acceptor.open(endp.protocol());
-//						_data_acceptor.bind(endp);
-//						_data_acceptor.listen(asio::socket_base::max_listen_connections);
-//
-//						auto ip_bytes = _socket.local_endpoint().address().to_v4().to_bytes();
-//						auto port = _data_acceptor.local_endpoint().port();
-//
-//						std::stringstream stream;
-//						stream << "Entering passive mode (";
-//						for (size_t i = 0; i < 4; i++)
-//						{
-//							stream << static_cast<int>(ip_bytes[i]) << ",";
-//						}
-//						stream << ((port >> 8) & 0xff) << "," << (port & 0xff) << ")";
-//
-//
-//
-//						deliver(assembleResponse(FTPCode::ENTERING_PASV_MODE, stream.str()));
-//
-//					}
-//					else {
-//						deliver(assembleResponse(FTPCode::UNKNOWN_COMMAND, "bad command >:"));
-//					}
-//				}
-//				else {
-//					deliver(assembleResponse(FTPCode::COMMAND_NOT_IMPLEMENTED, "wher command? >:"));
-//				}
-//
-//
-//			}
-//
-//			do_read();
-//		});
-//}
 
 Server::Server(asio::io_context& context, const tcp::endpoint& endpoint, const std::string& root_path) : _context(context), _acceptor(context, endpoint), _root_path(root_path) {
 	do_accept();

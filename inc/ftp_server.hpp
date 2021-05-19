@@ -7,6 +7,7 @@
 #include <asio.hpp>
 #include <list>
 #include <deque>
+#include <atomic>
 namespace fs = std::filesystem;
 using asio::ip::tcp;
 
@@ -41,7 +42,14 @@ public:
 	void comm_size(const std::string& input);
 	void comm_retr(const std::string& input);
 	void comm_quit(const std::string& input);
-	void comm_mlsd_list(const std::string& input);
+	void comm_list(const std::string& input);
+	void comm_mlsd(const std::string& input);
+	void comm_nlst(const std::string& input);
+	void comm_rest(const std::string& input);
+	void comm_feat(const std::string& input);
+	void comm_opts(const std::string& input);
+	void comm_syst(const std::string& input);
+	void comm_noop(const std::string& input);
 
 private:
 	std::deque<std::pair<tcp::socket, std::vector<uint8_t>>> _data_queue;
@@ -52,9 +60,9 @@ private:
 	tcp::acceptor _data_acceptor;
 	asio::io_context& _context;
 
-	bool _alive = true;
+	std::atomic<bool> _alive = true;
 
-	int64_t rest = -1;
+	int64_t rest = 0;
 
 	fs::path disk_root_path = fs::u8path(u8"X:/");
 	fs::path virtual_curr_path = fs::u8path(u8"");

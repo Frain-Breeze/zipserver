@@ -13,38 +13,38 @@
 // x3x _A_ = authentication = login process etc
 // x5x _F_ = filesystem = related to file operations
 
-/*enum class FTPCode : uint16_t {
-	PP_S_INITIATED = 100,
+enum class FTPCode : uint16_t {
+	POS_EARLY_INITIATED = 100,
 	//110
 	//120
 	//125
-	PP_F_STATUS_OK = 150,
+	POS_EARLY_STATUS_OK = 150, //for opening data connection
 
-	PC_S_SUCCESS = 200, //general ok?
-	//202
-	//211
-	//212
-	//213
-	//214
-	//215
-	PC_C_READY_NEW_USER = 220,
+	POS_COMPLETE_SUCCESS = 200, //general ok?
+	POS_COMPLETE_NOT_IMPLEMENTED = 202,
+	POS_COMPLETE_SYSTEM_STATUS = 211,
+	POS_COMPLETE_DIRECTORY_STATUS = 212,
+	POS_COMPLETE_FILE_STATUS = 213,
+	POS_COMPLETE_HELP_MESSAGE = 214,
+	POS_COMPLETE_NAME_SYSTEM_TYPE = 215, //response to SYST?
+	POS_COMPLETE_READY_NEW_USER = 220,
 	//221
 	//225
-	//226
-	PC_C_ENTER_PASV = 227,
+	POS_COMPLETE_CLOSING_DATA_CONNECTION = 226,
+	POS_COMPLETE_ENTER_PASV = 227,
 	//227 long pasv
 	//229 extended pasv
-	PC_A_LOGGED_IN = 230, //user logged in
+	POS_COMPLETE_LOGGED_IN = 230, //user logged in
 	//231
 	//232
 	//234
-	//250
-	PC_F_NAME_CREATED = 257, //used as PWD return
+	POS_COMPLETE_FILE_ACTION_OKAY = 250,
+	POS_COMPLETE_NAME_CREATED = 257, //used as PWD return
 
-	PI_S_ON_HOLD = 300,
-	PI_A_NEED_PASSWORD = 331,
-	PI_A_NEED_ACCOUNT = 332,
-	PI_F_PENDING_FURTHER_INFO = 350,
+	POS_MID_ON_HOLD = 300,
+	POS_MID_NEED_PASSWORD = 331,
+	POS_MID_NEED_ACCOUNT = 332,
+	POS_MID_PENDING_FURTHER_INFO = 350,
 
 	//400
 	//421
@@ -57,14 +57,14 @@
 	//452
 
 	//500
-	//501
+	NEG_PERM_SYNTAX_ERROR = 501,
 	//502
 	//503
 	//504
 	//530
 	//532
 	//534
-	//550
+	NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE = 550,
 	//551
 	//552
 	//553
@@ -73,9 +73,9 @@
 	//631
 	//632
 	//633
-};*/
+};
 
-enum class FTPCode : uint16_t {
+/*enum class FTPCode : uint16_t {
 	COMMAND_NOT_IMPLEMENTED = 202,
 	READY = 220, //used directly after establishing connection
 	NEED_PASSWORD = 331, //used after getting username
@@ -90,4 +90,5 @@ enum class FTPCode : uint16_t {
 	FILE_STATUS = 213,
 	SYSTEM_STATUS = 211,
 	SYNTAX_ERROR_IN_COMMAND = 501,
-};
+	YES_REST = 350,
+};*/
