@@ -5,6 +5,7 @@
 
 
 int main(int argc, char* argv[]) {
+	SetConsoleOutputCP(65001);
 	printf("usage: .exe [port] \"[path to root]\"\n");
 
 	if (argc == 3) {
@@ -19,7 +20,6 @@ int main(int argc, char* argv[]) {
 		Server ser(io_context, endp, argv[2]);
 		printf("server started on port %d with root folder %s\n", port, argv[2]);
 		io_context.run();
-		
 	}
 	else {
 		printf("not enough arguments, or too many! we need 2, we have %d\n", argc - 1);
