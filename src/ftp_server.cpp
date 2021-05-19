@@ -2,6 +2,8 @@
 #include "ftp_response.hpp"
 #include "ftp_command_retr.hpp"
 
+#include "util_file_time.hpp"
+
 #include <asio.hpp>
 #include <iostream>
 #include <deque>
@@ -63,11 +65,19 @@ std::string list_complete(fs::path& path, bool metadata, bool unix) {
 
 					if (!a.isDir()) {
 						if (metadata) {
+							const auto modify_time = a.getProperty(BitProperty::MTime);
+							auto ft = modify_time.filetime;
+							ULARGE_INTEGER ull; ull.LowPart = ft.dwLowDateTime;
+							ull.HighPart = ft.dwHighDateTime;
+							time_t tim = ull.QuadPart / 10000000ULL - 11644473600ULL;
 							if (unix) {
 								towrite += "-r-------- 1 loli loli " + std::to_string(a.size()) + " Jan 1 1707 ";
 							}
 							else {
-								towrite += "Type=file;Size=" + std::to_string(a.size()) + ";Modify=17070101010101.000;Perm=r; ";
+								const std::string modify = util_file::write_time_mlsd(localtime(&tim));
+								towrite += "Type=file;Size=" + std::to_string(a.size()) + ";";
+								towrite += modify;
+								towrite += ";Perm=r; ";
 							}
 						}
 
@@ -79,9 +89,6 @@ std::string list_complete(fs::path& path, bool metadata, bool unix) {
 
 						towrite += "\r\n";
 					}
-					//else if (a.isDir()) {
-					//	towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
-					//}
 				}
 			}
 			catch (const BitException& e) {
@@ -97,25 +104,23 @@ std::string list_complete(fs::path& path, bool metadata, bool unix) {
 			const auto ext = e.path().extension().u8string();
 			if (metadata) {
 				if (unix) {
-					if (ext == ".zip" || ext == ".rar" || ext == ".7z") {
+					if (ext == ".zip" || ext == ".rar" || ext == ".7z" || e.is_directory()) {
 						towrite += "dr-------- 1 loli loli 0 Jan 1 1707 ";
 					}
 					else if (e.is_regular_file()) {
 						towrite += "-r-------- 1 loli loli " + std::to_string(e.file_size()) + " Jan 1 1707 ";
 					}
-					else if (e.is_directory()) {
-						towrite += "dr-------- 1 loli loli 0 Jan 1 1707 ";
-					}
 				}
 				else {
-					if (ext == ".zip" || ext == ".rar" || ext == ".7z") {
-						towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
+					const std::string modify = util_file::write_time_mlsd(util_file::last_modify(e.path()));
+
+					if (ext == ".zip" || ext == ".rar" || ext == ".7z" || e.is_directory()) {
+						towrite += "Type=dir;";
+						towrite += modify;
+						towrite +=";Perm=el; ";
 					}
 					else if (e.is_regular_file()) {
-						towrite += "Type=file;Size=" + std::to_string(e.file_size()) + ";Modify=17070101010101.000;Perm=r; ";
-					}
-					else if (e.is_directory()) {
-						towrite += "Type=dir;Modify=17070101010101.000;Perm=el; ";
+						towrite += "Type=file;Size=" + std::to_string(e.file_size()) + ";" + modify + ";Perm=r; ";
 					}
 				}
 			}
