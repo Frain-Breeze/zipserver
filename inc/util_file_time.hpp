@@ -11,8 +11,11 @@ namespace util_file {
 		return localtime(&systemTime);
 	}
 
-	std::string write_time_unix(const std::filesystem::path& path) {
-		return "";
+	std::string write_time_unix(tm* lsystemTime) {
+		const char* months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+		char buf[256];
+		snprintf(buf, 256, "%s %d %d:%d", months[lsystemTime->tm_mon], lsystemTime->tm_mday, lsystemTime->tm_hour, lsystemTime->tm_min);
+		return buf;
 	}
 
 	std::string write_time_mlsd(tm* lsystemTime) {

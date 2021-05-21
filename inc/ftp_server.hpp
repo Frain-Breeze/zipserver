@@ -42,6 +42,7 @@ public:
 	void comm_size(const std::string& input);
 	void comm_retr(const std::string& input);
 	void comm_quit(const std::string& input);
+	void comm_abor(const std::string& input);
 	void comm_list(const std::string& input);
 	void comm_mlsd(const std::string& input);
 	void comm_nlst(const std::string& input);

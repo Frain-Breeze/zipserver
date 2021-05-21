@@ -71,7 +71,7 @@ std::string list_complete(fs::path& path, bool metadata, bool unix) {
 							ull.HighPart = ft.dwHighDateTime;
 							time_t tim = ull.QuadPart / 10000000ULL - 11644473600ULL;
 							if (unix) {
-								towrite += "-r-------- 1 loli loli " + std::to_string(a.size()) + " Jan 1 1707 ";
+								towrite += "-r-------- 1 loli loli " + std::to_string(a.size()) + " " + util_file::write_time_unix(localtime(&tim)) + " ";
 							}
 							else {
 								const std::string modify = util_file::write_time_mlsd(localtime(&tim));
@@ -104,11 +104,13 @@ std::string list_complete(fs::path& path, bool metadata, bool unix) {
 			const auto ext = e.path().extension().u8string();
 			if (metadata) {
 				if (unix) {
+					const std::string modify = util_file::write_time_unix(util_file::last_modify(e.path()));
+
 					if (ext == ".zip" || ext == ".rar" || ext == ".7z" || e.is_directory()) {
-						towrite += "dr-------- 1 loli loli 0 Jan 1 1707 ";
+						towrite += "dr-------- 1 loli loli 0 " + modify + " ";
 					}
 					else if (e.is_regular_file()) {
-						towrite += "-r-------- 1 loli loli " + std::to_string(e.file_size()) + " Jan 1 1707 ";
+						towrite += "-r-------- 1 loli loli " + std::to_string(e.file_size()) + " " + modify + " ";
 					}
 				}
 				else {
@@ -372,11 +374,15 @@ void Session::comm_syst(const std::string& input) {
 void Session::comm_quit(const std::string& input) {
 	_alive = false;
 	_data_queue.clear();
-	deliver(assembleResponse(FTPCode::POS_COMPLETE_SUCCESS, "set session to inactive"));
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_CLOSING_CONTROL_CONNECTION, "set session to inactive"));
 	_socket.close();
 }
+void Session::comm_abor(const std::string& input) {
+	_data_queue.clear();
+	deliver(assembleResponse(FTPCode::POS_COMPLETE_CLOSING_DATA_CONNECTION, "set session to inactive"));
+}
 void Session::comm_feat(const std::string& input) {
-	deliver("211- extensions supported:\r\n UTF8\r\n MLSD\r\n211 end.\r\n");
+	deliver("211- extensions supported:\r\nUTF8\r\nMLSD\r\n211 end.\r\n");
 }
 void Session::comm_opts(const std::string& input) {
 	deliver(assembleResponse(FTPCode::POS_COMPLETE_SUCCESS, "didn't actually check the option but it should be okay"));
@@ -509,6 +515,7 @@ void Session::do_read() {
 					{"size", std::bind(&Session::comm_size, this, std::placeholders::_1)},
 					{"retr", std::bind(&Session::comm_retr, this, std::placeholders::_1)},
 					{"quit", std::bind(&Session::comm_quit, this, std::placeholders::_1)},
+					{"abor", std::bind(&Session::comm_abor, this, std::placeholders::_1)},
 					{"rest", std::bind(&Session::comm_rest, this, std::placeholders::_1)},
 					{"feat", std::bind(&Session::comm_feat, this, std::placeholders::_1)},
 					{"opts", std::bind(&Session::comm_opts, this, std::placeholders::_1)},
