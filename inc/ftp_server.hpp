@@ -8,6 +8,7 @@
 #include <list>
 #include <deque>
 #include <atomic>
+#include <unordered_map>
 namespace fs = std::filesystem;
 using asio::ip::tcp;
 
@@ -53,6 +54,11 @@ public:
 	void comm_noop(const std::string& input);
 
 private:
+
+	fs::path assemble_path(const std::string& root, const fs::path& virt);
+	std::string clean_root_point(const std::string& to_clean);
+	fs::path strip_root_point(const fs::path& to_strip);
+
 	std::deque<std::pair<tcp::socket, std::vector<uint8_t>>> _data_queue;
 	tcp::socket _socket;
 	std::string _message;
@@ -65,7 +71,13 @@ private:
 
 	int64_t rest = 0;
 
-	fs::path disk_root_path = fs::u8path(u8"X:/");
+	std::unordered_map<std::string, fs::path> root_points = {
+		{"sagiri", "L:/rip/"},
+		{"megumin", "M:/"},
+		{"chino", "D:/"}
+	};
+	std::string curr_root_point = "";
+
 	fs::path virtual_curr_path = fs::u8path(u8"");
 };
 

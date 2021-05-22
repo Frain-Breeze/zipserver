@@ -3,6 +3,7 @@
 #include "ftp_command_retr.hpp"
 
 #include "util_file_time.hpp"
+#include "ftp_path_resolver.hpp"
 
 #include <asio.hpp>
 #include <iostream>
@@ -27,7 +28,7 @@ using namespace bit7z;
 
 namespace fs = std::filesystem;
 
-std::string list_complete(fs::path& path, bool metadata, bool unix) {
+std::string list_complete(const fs::path& path, bool metadata, bool unix) {
 	fs::path curr = "";
 	fs::path before_curr = "";
 
@@ -260,7 +261,7 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 
 
 
-Session::Session(tcp::socket socket, asio::io_context& context, const std::string& root_path) : _context(context), _socket(std::move(socket)), _data_acceptor(context), disk_root_path(root_path) {}
+Session::Session(tcp::socket socket, asio::io_context& context, const std::string& root_path) : _context(context), _socket(std::move(socket)), _data_acceptor(context) {}
 
 Session::~Session() {
 	std::cout << "oh no session got destructed\n";
@@ -391,10 +392,12 @@ void Session::comm_noop(const std::string& input) {
 	deliver(assembleResponse(FTPCode::POS_COMPLETE_SUCCESS, "succesfully did absolutely nothing"));
 }
 void Session::comm_size(const std::string& input) {
-	fs::path assembled = fs::u8path(disk_root_path.u8string());
-	assembled /= fs::u8path(virtual_curr_path.u8string());
-	assembled /= fs::u8path(input);
+	//fs::path assembled = fs::u8path(disk_root_path.u8string());
+	//assembled /= fs::u8path(virtual_curr_path.u8string());
+	//assembled /= fs::u8path(input);
 	//std::cout << "file thing: " << assembled << "\n";
+	fs::path assembled = assemble_path(curr_root_point, fs::u8path(virtual_curr_path.u8string()));
+	assembled /= fs::u8path(input);
 
 	if (fs::is_regular_file(assembled)) {
 		deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_STATUS, std::to_string(fs::file_size(assembled))));
@@ -409,7 +412,9 @@ void Session::comm_size(const std::string& input) {
 	}
 }
 void Session::comm_nlst(const std::string& input) {
-	fs::path diskroot = disk_root_path;
+	
+	printf("badddd\n\n\n\n\n\n\n\n\n\n\n\n\n");
+	/*fs::path diskroot = disk_root_path;
 	fs::path virtpath = (input == "") ? virtual_curr_path : fs::u8path(input);
 
 	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to list directory contents, without metadata"));
@@ -423,45 +428,96 @@ void Session::comm_nlst(const std::string& input) {
 			std::string towrite = list_complete(path_to_list, false, false);
 			deliver_data(std::move(socket), towrite);
 		}
-	);
+	);*/
 }
 void Session::comm_mlsd(const std::string& input) {
-	fs::path diskroot = disk_root_path;
-	fs::path virtpath = virtual_curr_path;
+	const std::string root_point = curr_root_point;
+	const fs::path to_list = assemble_path(curr_root_point, virtual_curr_path);
 
 	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to list directory contents, with metadata"));
 
 	auto self(shared_from_this());
 	_data_acceptor.async_accept(
-		[this, self, diskroot, virtpath](std::error_code ec, tcp::socket socket) {
-			fs::path path_to_list = diskroot;
-			path_to_list /= virtpath;
-			//std::cout << "path thing root: " << diskroot.u8string() << " virtual: " << virtpath.u8string() << " combined: "<< path_to_list.u8string() << "\n";
-			std::string towrite = list_complete(path_to_list, true, false);
+		[this, self, to_list, root_point](std::error_code ec, tcp::socket socket) {
+			std::string towrite;
+			if (root_point == "") {
+				for (const auto& i : root_points) {
+					towrite += "Type=dir;Perm=el; ";
+					towrite += i.first;
+					towrite += "\r\n";
+				}
+			}
+			else {
+				towrite = list_complete(to_list, true, false);
+			}
 			deliver_data(std::move(socket), towrite);
 		}
 	);
 }
 
 void Session::comm_list(const std::string& input) {
-	fs::path diskroot = disk_root_path;
-	fs::path virtpath = virtual_curr_path;
+	const std::string root_point = curr_root_point;
+	const fs::path to_list = assemble_path(curr_root_point, virtual_curr_path);
 
 	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to list directory contents, with metadata"));
 
 	auto self(shared_from_this());
 	_data_acceptor.async_accept(
-		[this, self, diskroot, virtpath](std::error_code ec, tcp::socket socket) {
-			fs::path path_to_list = diskroot;
-			path_to_list /= virtpath;
-			//std::cout << "path thing root: " << diskroot.u8string() << " virtual: " << virtpath.u8string() << " combined: "<< path_to_list.u8string() << "\n";
-			std::string towrite = list_complete(path_to_list, true, true);
+		[this, self, to_list, root_point](std::error_code ec, tcp::socket socket) {
+			std::string towrite;
+			if (root_point == "") {
+				for (const auto& i : root_points) {
+					towrite += "dr-------- 1 loli loli 0 Jan 1 17:07 ";
+					towrite += i.first;
+					towrite += "\r\n";
+				}
+			}
+			else {
+				towrite = list_complete(to_list, true, false);
+			}
 			deliver_data(std::move(socket), towrite);
 		}
 	);
 }
 void Session::comm_cwd(const std::string& input) {
 	if (input.size() > 0) {
+		if (input[0] == '/') {
+
+			std::string first_part = "";
+			for (const auto& i : fs::u8path(input)) {
+				if (i != "/") {
+					first_part = i.u8string();
+					break;
+				}
+			}
+
+			const auto found_root = root_points.find(first_part);
+			if (found_root != root_points.end()) {
+				curr_root_point = found_root->first;
+
+				virtual_curr_path = strip_root_point(fs::u8path(input));
+				deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_ACTION_OKAY, (std::string)"\"" + virtual_curr_path.u8string() + "\""));
+				return;
+			}
+			else if (input.size() == 1) {
+				curr_root_point = "";
+				virtual_curr_path = "/";
+				deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_ACTION_OKAY, (std::string)"\"" + virtual_curr_path.u8string() + "\""));
+				return;
+			}
+			deliver(assembleResponse(FTPCode::NEG_PERM_SYNTAX_ERROR, "something went wrong"));
+			return;
+		}
+		else {
+			virtual_curr_path /= fs::u8path(input);
+			deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_ACTION_OKAY, (std::string)"\"" + virtual_curr_path.u8string() + "\""));
+			return;
+		}
+	}
+	
+	deliver(assembleResponse(FTPCode::NEG_PERM_SYNTAX_ERROR, "something went wrong"));
+
+	/*if (input.size() > 0) {
 		if (input[0] == '/') { //dash means non-relative
 			virtual_curr_path = fs::u8path(input);
 		}
@@ -471,7 +527,7 @@ void Session::comm_cwd(const std::string& input) {
 		deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_ACTION_OKAY, (std::string)"\"" + virtual_curr_path.u8string() + "\""));
 		return;
 	}
-	deliver(assembleResponse(FTPCode::NEG_PERM_SYNTAX_ERROR, "you need to provide an argument to change the directory to"));
+	deliver(assembleResponse(FTPCode::NEG_PERM_SYNTAX_ERROR, "you need to provide an argument to change the directory to"));*/
 }
 void Session::comm_pasv(const std::string& input) {
 	if (_data_acceptor.is_open()) {
@@ -521,7 +577,7 @@ void Session::do_read() {
 					{"opts", std::bind(&Session::comm_opts, this, std::placeholders::_1)},
 					{"syst", std::bind(&Session::comm_syst, this, std::placeholders::_1)},
 					{"noop", std::bind(&Session::comm_noop, this, std::placeholders::_1)},
-					{"nlst", std::bind(&Session::comm_nlst, this, std::placeholders::_1)},
+					//{"nlst", std::bind(&Session::comm_nlst, this, std::placeholders::_1)},
 				};
 
 				std::istream respstream(&_response);
