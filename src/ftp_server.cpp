@@ -382,7 +382,7 @@ void Session::comm_abor(const std::string& input) {
 	deliver(assembleResponse(FTPCode::POS_COMPLETE_CLOSING_DATA_CONNECTION, "set session to inactive"));
 }
 void Session::comm_feat(const std::string& input) {
-	deliver("211- extensions supported:\r\nUTF8\r\nMLSD\r\n211 end.\r\n");
+	deliver("211- extensions supported:\r\n UTF8\r\n MLSD\r\n211 end.\r\n");
 }
 void Session::comm_opts(const std::string& input) {
 	deliver(assembleResponse(FTPCode::POS_COMPLETE_SUCCESS, "didn't actually check the option but it should be okay"));
