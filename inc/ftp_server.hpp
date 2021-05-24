@@ -20,7 +20,7 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 
 class Session : public std::enable_shared_from_this<Session> {
 public:
-	Session(tcp::socket socket, asio::io_context& context, const std::string& root_path);
+	Session(tcp::socket socket, asio::io_context& context, std::unordered_map<std::string, fs::path>& points);
 	~Session();
 
 	void start();
@@ -71,11 +71,11 @@ private:
 
 	int64_t rest = 0;
 
-	std::unordered_map<std::string, fs::path> root_points = {
+	std::unordered_map<std::string, fs::path> root_points/* = {
 		{"sagiri", "L:/rip/"},
 		{"megumin", "M:/"},
 		{"chino", "D:/"}
-	};
+	}*/;
 	std::string curr_root_point = "";
 
 	fs::path virtual_curr_path = fs::u8path(u8"");
@@ -83,14 +83,14 @@ private:
 
 class Server {
 public:
-	Server(asio::io_context& context, const tcp::endpoint& endpoint, const std::string& root_path);
+	Server(asio::io_context& context, const tcp::endpoint& endpoint, std::unordered_map<std::string, fs::path>& points);
 
 	void do_garbage();
 	void do_accept();
 
 private:
-	std::string _root_path = "";
 	std::list<std::shared_ptr<Session>> _sessions;
 	asio::io_context& _context;
 	tcp::acceptor _acceptor;
+	std::unordered_map<std::string, fs::path> _root_points;
 };

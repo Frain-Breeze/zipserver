@@ -18,6 +18,7 @@
 #include <list>
 
 #include <map>
+#include <unordered_map>
 
 #include <Windows.h>
 
@@ -261,7 +262,7 @@ void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto
 
 
 
-Session::Session(tcp::socket socket, asio::io_context& context, const std::string& root_path) : _context(context), _socket(std::move(socket)), _data_acceptor(context) {}
+Session::Session(tcp::socket socket, asio::io_context& context, std::unordered_map<std::string, fs::path>& points) : _context(context), _socket(std::move(socket)), _data_acceptor(context), root_points(points) {}
 
 Session::~Session() {
 	std::cout << "oh no session got destructed\n";
@@ -621,7 +622,7 @@ void Session::do_read() {
 	);
 }
 
-Server::Server(asio::io_context& context, const tcp::endpoint& endpoint, const std::string& root_path) : _context(context), _acceptor(context, endpoint), _root_path(root_path) {
+Server::Server(asio::io_context& context, const tcp::endpoint& endpoint, std::unordered_map<std::string, fs::path>& points) : _context(context), _acceptor(context, endpoint), _root_points(points) {
 	do_accept();
 }
 
@@ -644,7 +645,7 @@ void Server::do_accept() {
 	_acceptor.async_accept(
 		[this](std::error_code ec, tcp::socket socket) {
 			if (!ec) {
-				_sessions.emplace_front(std::make_shared<Session>(std::move(socket), _context, _root_path))->start();
+				_sessions.emplace_front(std::make_shared<Session>(std::move(socket), _context, _root_points))->start();
 			}
 
 			do_garbage();
