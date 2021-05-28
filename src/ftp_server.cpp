@@ -614,7 +614,10 @@ void Session::do_read() {
 				}
 			}
 			else {
-
+				_alive = false;
+				printf("ec! bad!\n");
+				//TODO: close connection? check what the error is?
+				return;
 			}
 
 			do_read();
