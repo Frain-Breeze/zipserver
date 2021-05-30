@@ -474,7 +474,7 @@ void Session::comm_list(const std::string& input) {
 				}
 			}
 			else {
-				towrite = list_complete(to_list, true, false);
+				towrite = list_complete(to_list, true, true);
 			}
 			deliver_data(std::move(socket), towrite);
 		}
@@ -615,8 +615,12 @@ void Session::do_read() {
 			}
 			else {
 				_alive = false;
-				printf("ec! bad!\n");
-				//TODO: close connection? check what the error is?
+				if (ec.value() == 2) { //EOF
+					printf("closing connection with %s:%d\n", _socket.remote_endpoint().address().to_string().c_str(), _socket.remote_endpoint().port());
+				}
+				else {
+					printf("error in reading command: %s (%d)", ec.message().c_str(), ec.value());
+				}
 				return;
 			}
 
