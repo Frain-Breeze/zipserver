@@ -38,6 +38,7 @@ public:
 	void comm_user(const std::string& input);
 	void comm_pwd(const std::string& input);
 	void comm_cwd(const std::string& input);
+	void comm_cdup(const std::string& input);
 	void comm_pasv(const std::string& input);
 	void comm_type(const std::string& input);
 	void comm_size(const std::string& input);

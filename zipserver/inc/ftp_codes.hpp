@@ -49,7 +49,7 @@ enum class FTPCode : uint16_t {
 	//400
 	//421
 	//425
-	//426
+	NEG_TEMP_TRANSFER_ABORTED = 426,
 	//430
 	//434
 	//450

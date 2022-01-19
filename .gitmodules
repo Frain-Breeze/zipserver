@@ -4,3 +4,6 @@
 [submodule "lib/bit7z"]
 	path = lib/bit7z
 	url = https://github.com/rikyoz/bit7z
+[submodule "lib/libarchive"]
+	path = lib/libarchive
+	url = https://github.com/libarchive/libarchive

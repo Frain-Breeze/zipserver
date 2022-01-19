@@ -18,6 +18,8 @@ fs::path Session::strip_root_point(const fs::path& to_strip) {
 	fs::path ret_rel = to_strip.relative_path();
 	if (ret_rel.empty()) { return ret_rel; }
 	ret_rel = ret_rel.lexically_relative(*ret_rel.begin());
+	printf("ret_rel = %s\n", ret_rel.u8string().c_str());
+	if(ret_rel == ".") { ret_rel = ""; }
 	return ret_rel;
 }
 

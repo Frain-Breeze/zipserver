@@ -6,7 +6,9 @@
 
 
 int main(int argc, char* argv[]) {
+#ifdef ON_WINDOWS
 	SetConsoleOutputCP(65001);
+#endif
 	printf("usage: .exe\n");
 
 	if (argc == 1) {
