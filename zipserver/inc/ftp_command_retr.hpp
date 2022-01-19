@@ -56,13 +56,16 @@ void Session::comm_retr(const std::string& input) {
 	else {
 		root_point = input.substr(0, input.find_first_of('/'));
 
+		//HACK: should root point even be processed here? doesn't make a whole lot of sense to me...
 		const auto found_root = root_points.find(root_point);
 		if (found_root != root_points.end()) {
 			root_point = found_root->first;
 			curr_path = strip_root_point(fs::u8path(input));
 		}
 		else {
-			printf("bad2\n\n\n\n\n\n\n\n\n\n\n\n");
+			root_point = curr_root_point;
+			curr_path = virtual_curr_path;
+			curr_path /= input;
 		}
 	}
 	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to send file"));
@@ -166,8 +169,8 @@ void Session::comm_retr(const std::string& input) {
 					size_t fsize = ifile.tellg();
 					ifile.seekg(0, std::ios::beg);
 
-					if (fsize == -1)
-						throw;
+					//if (fsize == -1)
+					//	throw;
 
 					size_t chunk_size = (fsize > chunk_threshhold) ? chunk_size_small : fsize; //send the entire file in one go if it's small enough ...
 					if (rest != 0) {
