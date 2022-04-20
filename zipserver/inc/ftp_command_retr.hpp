@@ -170,14 +170,14 @@ void Session::comm_retr(const std::string& input) {
 
 			try {
 
-				std::ifstream ifile(path_to_get.u8string(), std::ios::binary | std::ios::ate);
+				std::ifstream ifile(path_to_get.u16string(), std::ios::binary | std::ios::ate); //TODO: why is u16string required 
 				if (!ifile.bad()) {
 					int64_t progress = 0;
 					int64_t fsize = ifile.tellg();
 					ifile.seekg(0, std::ios::beg);
 
-					//if (fsize == -1)
-					//	throw;
+					if (fsize < 0)
+						throw std::exception("file size is negative");
 
 					int64_t chunk_size = (fsize > chunk_threshhold) ? chunk_size_small : fsize; //send the entire file in one go if it's small enough ...
 					if (rest != 0) {
@@ -206,12 +206,15 @@ void Session::comm_retr(const std::string& input) {
 
 					ifile.close();
 				}
+				else {
+					deliver(assembleResponse(FTPCode::NEG_TEMP_TRANSFER_ABORTED, "closing data connection, transmission failed (file couldn't be opened)"));
+				}
 				deliver(assembleResponse(FTPCode::POS_COMPLETE_CLOSING_DATA_CONNECTION, "closing data connection, transmission succeeded"));
 				socket.close();
 			}
 			catch (std::exception& e) {
 				std::cout << "taihen in file read: " << e.what() << "\n";
-				deliver(assembleResponse(FTPCode::NEG_TEMP_TRANSFER_ABORTED, "closing data connection, transmission failed"));
+				deliver(assembleResponse(FTPCode::NEG_TEMP_TRANSFER_ABORTED, "closing data connection, transmission failed (" + (std::string)e.what() + ")"));
 				socket.close();
 			}
 		}

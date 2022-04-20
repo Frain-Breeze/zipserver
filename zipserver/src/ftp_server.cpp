@@ -190,7 +190,7 @@ std::string list_complete(const fs::path& path, bool metadata, bool is_unix) {
 		}
 	}
 	catch (fs::filesystem_error& e) {
-		std::cout << "taihen: " << e.what() << "\n";
+		std::cout << "taihen: " << ((fs::path)e.what()).u8string() << "\n";
 	}
 
 	std::cout << towrite << "\n";
@@ -495,8 +495,6 @@ void Session::comm_size(const std::string& input) {
 	//std::cout << "file thing: " << assembled << "\n";
 	
 	
-	
-	
 	//const auto found_root = root_points.find(curr_root_point);
 	//if(found_root == root_points.end()) {
 	//	deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "something went horribly wrong"));
@@ -511,6 +509,7 @@ void Session::comm_size(const std::string& input) {
 		const auto found_root = root_points.find(temp_root);
 		if(found_root == root_points.end()) {
 			deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "something went horribly wrong 1"));
+			return;
 		}
 		
 		to_search = found_root->second;
@@ -522,15 +521,19 @@ void Session::comm_size(const std::string& input) {
 			const auto found_root = root_points.find(temp_root);
 			if(found_root == root_points.end()) {
 				deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "something went horribly wrong 2"));
+				return;
 			}
 			
 			to_search = found_root->second;
-			to_search /= strip_root_point(input);
+			fs::path b = fs::u8path(input);
+			fs::path a = strip_root_point(b);
+			to_search /= a;
 		}
 		else {
 			const auto found_root = root_points.find(curr_root_point);
 			if(found_root == root_points.end()) {
 				deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "something went horribly wrong 3"));
+				return;
 			}
 			
 			to_search = assemble_path(curr_root_point, fs::u8path(virtual_curr_path.u8string()));
@@ -554,7 +557,7 @@ void Session::comm_size(const std::string& input) {
 				deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_STATUS, std::to_string(filesize)));
 		}
 		catch (fs::filesystem_error& e) {
-			deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "can't get filesize of file (%s)", e.what()));
+			deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "can't get filesize of file (%s)" + (std::string)e.what()));
 		}
 	}
 }
