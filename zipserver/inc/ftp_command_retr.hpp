@@ -16,6 +16,7 @@
 //#include <bitexception.hpp>
 //using namespace bit7z;
 
+#define LIBARCHIVE_STATIC
 #include <archive.h>
 #include <archive_entry.h>
 
@@ -113,10 +114,10 @@ void Session::comm_retr(const std::string& input) {
 						if (archive_entry_filetype(ent) != AE_IFREG)
 							continue;
 
-						size_t outsize = archive_entry_size(ent);
+						int64_t outsize = archive_entry_size(ent);
 						data.resize(outsize);
-						size_t data_read = archive_read_data(ar, data.data(), outsize);
-						printf("read %d, should be %d bytes\n", data_read, outsize);
+						int64_t data_read = archive_read_data(ar, data.data(), outsize);
+						printf("read %lld, should be %lld bytes\n", data_read, outsize);
 						if ((int)data_read < 0)
 							printf("error in data read: %s\n", archive_error_string(ar));
 						archive_read_close(ar);
@@ -165,14 +166,14 @@ void Session::comm_retr(const std::string& input) {
 
 				std::ifstream ifile(path_to_get.u8string(), std::ios::binary | std::ios::ate);
 				if (!ifile.bad()) {
-					size_t progress = 0;
-					size_t fsize = ifile.tellg();
+					int64_t progress = 0;
+					int64_t fsize = ifile.tellg();
 					ifile.seekg(0, std::ios::beg);
 
 					//if (fsize == -1)
 					//	throw;
 
-					size_t chunk_size = (fsize > chunk_threshhold) ? chunk_size_small : fsize; //send the entire file in one go if it's small enough ...
+					int64_t chunk_size = (fsize > chunk_threshhold) ? chunk_size_small : fsize; //send the entire file in one go if it's small enough ...
 					if (rest != 0) {
 						chunk_size = chunk_size_small; //...unless we've been given an offset (probably indicating that it's looking for a tiny bit of metadata at the end)
 
@@ -182,12 +183,12 @@ void Session::comm_retr(const std::string& input) {
 					}
 
 					while (progress < fsize) {
-						size_t readCount = ((fsize - progress) < chunk_size) ? (fsize - progress) : chunk_size;
+						int64_t readCount = ((fsize - progress) < chunk_size) ? (fsize - progress) : chunk_size;
 
 						data.resize(readCount);
 						ifile.read((char*)data.data(), data.size());
 
-						printf("sending part of file: %d bytes into the file and size %d (with fsize=%d)\n", progress, readCount, fsize);
+						printf("sending part of file: %lld bytes into the file and size %lld (with fsize=%lld)\n", progress, readCount, fsize);
 						asio::write(socket, asio::buffer(data.data(), data.size()));
 
 						progress += readCount;

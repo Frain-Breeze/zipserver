@@ -20,15 +20,9 @@
 #include <map>
 #include <unordered_map>
 
+#define LIBARCHIVE_STATIC
 #include <archive.h>
 #include <archive_entry.h>
-
-//#include <Windows.h>
-
-//#include <bitextractor.hpp>
-//#include <bitarchiveinfo.hpp>
-//#include <bitexception.hpp>
-//using namespace bit7z;
 
 namespace fs = std::filesystem;
 
@@ -644,7 +638,7 @@ void Session::comm_cdup(const std::string& input) {
 }
 void Session::comm_cwd(const std::string& input) {
 	if (input.size() > 0) {
-		if (input[0] == '/') {
+		if (input[0] == '/' || curr_root_point == "") {
 
 			std::string first_part = "";
 			for (const auto& i : fs::u8path(input)) {
