@@ -75,9 +75,9 @@ std::string list_complete(const fs::path& path, bool metadata, bool is_unix) {
 						}
 						else {
 							const std::string modify = util_file::write_time_mlsd(localtime(&entry_mod_time));
-							new_entry += "Type=file;Size=" + std::to_string(archive_entry_size(ent)) + ";";
+							new_entry += "type=file;size=" + std::to_string(archive_entry_size(ent)) + ";";
 							new_entry += modify;
-							new_entry += ";Perm=r; ";
+							new_entry += ";perm=r; ";
 						}
 					}
 					
@@ -176,12 +176,12 @@ std::string list_complete(const fs::path& path, bool metadata, bool is_unix) {
 					const std::string modify = util_file::write_time_mlsd(util_file::last_modify(e.path()));
 
 					if (ext == ".zip" || ext == ".rar" || ext == ".7z" || e.is_directory()) {
-						towrite += "Type=dir;";
+						towrite += "type=dir;";
 						towrite += modify;
-						towrite +=";Perm=el; ";
+						towrite +=";perm=l; ";
 					}
 					else if (e.is_regular_file()) {
-						towrite += "Type=file;Size=" + std::to_string(e.file_size()) + ";" + modify + ";Perm=r; ";
+						towrite += "type=file;size=" + std::to_string(e.file_size()) + ";" + modify + ";perm=r; ";
 					}
 				}
 			}
@@ -261,7 +261,8 @@ int64_t get_filesize_complete(fs::path& path) {
 		before_curr /= e;
 	}
 	//if we get here, it must be a normal file
-
+	if(fs::is_directory(path))
+		return -1;
 	return fs::file_size(path);
 }
 void read_file_complete(std::vector<uint8_t>& data, fs::path& path, int64_t goto_offset) {
@@ -546,7 +547,11 @@ void Session::comm_size(const std::string& input) {
 	}
 	else {
 		try {
-			deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_STATUS, std::to_string(get_filesize_complete(to_search))));
+			int64_t filesize = get_filesize_complete(to_search);
+			if (filesize == -1)
+				deliver(assembleResponse(FTPCode::NEG_PERM_FILE_UNAVAILABLE, "this is a folder. not a file."));
+			else
+				deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_STATUS, std::to_string(filesize)));
 		}
 		catch (fs::filesystem_error& e) {
 			deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "can't get filesize of file"));
@@ -588,7 +593,7 @@ void Session::comm_mlsd(const std::string& input) {
 			std::string towrite;
 			if (root_point == "") {
 				for (const auto& i : root_points) {
-					towrite += "Type=dir;Perm=el; ";
+					towrite += "type=dir;perm=l; ";
 					towrite += i.first;
 					towrite += "\r\n";
 				}

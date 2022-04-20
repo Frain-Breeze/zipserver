@@ -69,9 +69,15 @@ void Session::comm_retr(const std::string& input) {
 			curr_path /= input;
 		}
 	}
-	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to send file"));
+
+
 	printf("curr path: %s\n", curr_path.u8string().c_str());
 	fs::path to_retrieve = assemble_path(root_point, curr_path);
+	if (fs::is_directory(to_retrieve)) {
+		deliver(assembleResponse(FTPCode::NEG_PERM_FILE_UNAVAILABLE, "this is a folder. not a file. what are you trying to achieve here?"));
+		return;
+	}
+	deliver(assembleResponse(FTPCode::POS_EARLY_STATUS_OK, "gonna open data conn to send file"));
 
 	auto self(shared_from_this());
 	_data_acceptor.async_accept(

@@ -56,7 +56,7 @@ enum class FTPCode : uint16_t {
 	//451
 	//452
 
-	//500
+	NEG_PERM_FILE_UNAVAILABLE = 500,
 	NEG_PERM_SYNTAX_ERROR = 501,
 	//502
 	//503
