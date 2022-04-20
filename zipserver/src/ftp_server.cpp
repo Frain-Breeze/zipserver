@@ -439,7 +439,7 @@ void Session::do_data_write() {
 }
 
 void Session::comm_rest(const std::string& input) {
-	if (sscanf(input.c_str(), "%ld", &rest) == 1) {
+	if (sscanf(input.c_str(), "%lld", &rest) == 1) {
 		deliver(assembleResponse(FTPCode::POS_MID_PENDING_FURTHER_INFO, (std::string)"set offset to " + std::to_string(rest)));
 	}
 	else {
@@ -554,7 +554,7 @@ void Session::comm_size(const std::string& input) {
 				deliver(assembleResponse(FTPCode::POS_COMPLETE_FILE_STATUS, std::to_string(filesize)));
 		}
 		catch (fs::filesystem_error& e) {
-			deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "can't get filesize of file"));
+			deliver(assembleResponse(FTPCode::NEG_PERM_ACTION_NOT_TAKEN_UNAVAILABLE, "can't get filesize of file (%s)", e.what()));
 		}
 	}
 }
