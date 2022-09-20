@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.10)
 
 project("zipserve")
 
@@ -17,10 +17,12 @@ if(WIN32)
 		set(LIBLZMA_LIBRARY "${CMAKE_SOURCE_DIR}/lib/liblzma/lib/x86/liblzma.lib")
 		set(ZLIB_LIBRARY "${CMAKE_SOURCE_DIR}/lib/zlib/lib/zlib_x86/zlibstatic.lib")
 	endif()
+else()
+
 endif()
 
 find_package(ZLIB REQUIRED)
-find_package(LIBLZMA REQUIRED)
+find_package(LibLZMA REQUIRED)
 if (ZLIB_FOUND)
     include_directories(${ZLIB_INCLUDE_DIRS})
 endif()

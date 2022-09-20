@@ -10,6 +10,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <string.h>
 
 //#include <bitextractor.hpp>
 //#include <bitarchiveinfo.hpp>
@@ -66,7 +67,7 @@ void Session::comm_retr(const std::string& input) {
 		else {
 			root_point = curr_root_point;
 			curr_path = virtual_curr_path;
-			curr_path /= input;
+			curr_path /= fs::u8path(input);
 		}
 	}
 
@@ -91,15 +92,17 @@ void Session::comm_retr(const std::string& input) {
 			fs::path before_curr = "";
 			for (const auto& e : path_to_get) {
 				const auto extt = before_curr.extension().u8string();
-				if (extt == ".zip" || extt == ".rar" || extt == ".7z") {
+				if (extt == ".zip_folder" || extt == ".rar_folder" || extt == ".7z_folder") {
+					std::string before_curr_real = before_curr.u8string();
+					before_curr_real.erase(before_curr_real.length() - 7); //remove "_folder"
 					archive* ar = archive_read_new();
 					archive_read_support_format_all(ar);
-					int r = archive_read_open_filename(ar, before_curr.u8string().c_str(), 16384);
+					int r = archive_read_open_filename_w(ar, fs::u8path(before_curr_real).wstring().data(), 16384);
 					if(r != ARCHIVE_OK) { std::cout << "taihen in file extract: " << archive_error_string(ar) << "\n"; }
 					
 					archive_entry* ent;
 					while(archive_read_next_header(ar, &ent) == ARCHIVE_OK) {
-						printf("%s -- ", archive_entry_pathname(ent));
+						//printf("%s -- ", archive_entry_pathname_utf8(ent));
 
 						//fs::path curr_path = before_curr;
 						std::string additional_path = "";
@@ -114,7 +117,7 @@ void Session::comm_retr(const std::string& input) {
 						//curr_path /= e;
 						//printf("%s\n", curr_path.u8string().c_str());
 
-						if (e != additional_path)
+						if (e != fs::u8path(additional_path))
 							continue;
 
 						if (archive_entry_filetype(ent) != AE_IFREG)
